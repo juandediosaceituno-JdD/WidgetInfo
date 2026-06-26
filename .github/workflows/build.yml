@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # permite lanzarlo manualmente desde GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,6 +21,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.9
 
       - name: Grant execute permission to gradlew
         run: chmod +x gradlew
