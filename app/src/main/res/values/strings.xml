@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Weather Widget</string>
+    <string name="widget_description">Widget de clima, hora y calendario</string>
+    <string name="permissions_needed">Este widget necesita permisos de ubicación y calendario para funcionar.</string>
+    <string name="grant_permissions">Otorgar permisos</string>
+    <string name="permissions_ok">✓ Permisos otorgados — puedes agregar el widget a tu pantalla de inicio</string>
+</resources>
