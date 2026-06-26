@@ -14,36 +14,30 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- Hora y fecha -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <TextClock
+            <TextView
                 android:id="@+id/widget_time"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:format12Hour="hh:mm a"
-                android:format24Hour="HH:mm"
+                android:text="--:--"
                 android:textSize="30sp"
                 android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
+                android:textStyle="bold" />
 
-            <TextClock
+            <TextView
                 android:id="@+id/widget_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:format12Hour="EEEE d 'de' MMMM"
-                android:format24Hour="EEEE d 'de' MMMM"
+                android:text="---"
                 android:textSize="12sp"
-                android:textColor="#CCFFFFFF"
-                android:layout_marginTop="1dp" />
+                android:textColor="#CCFFFFFF" />
         </LinearLayout>
 
-        <!-- Clima -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -58,21 +52,18 @@
                 android:text="--°"
                 android:textSize="30sp"
                 android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:includeFontPadding="false" />
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_condition"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Cargando..."
+                android:text="..."
                 android:textSize="11sp"
-                android:textColor="#CCFFFFFF"
-                android:gravity="center" />
+                android:textColor="#CCFFFFFF" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Divisor -->
     <View
         android:layout_width="match_parent"
         android:layout_height="0.5dp"
@@ -80,7 +71,6 @@
         android:layout_marginTop="4dp"
         android:layout_marginBottom="4dp" />
 
-    <!-- Eventos del calendario -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -92,7 +82,7 @@
             android:id="@+id/widget_event1"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Sin eventos hoy"
+            android:text="📅 Sin eventos hoy"
             android:textSize="11sp"
             android:textColor="#EEFFFFFF"
             android:ellipsize="end"

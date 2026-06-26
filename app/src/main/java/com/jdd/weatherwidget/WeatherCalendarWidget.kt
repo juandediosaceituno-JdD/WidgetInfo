@@ -3,7 +3,6 @@ package com.jdd.weatherwidget
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
-import android.content.Intent
 import android.provider.CalendarContract
 import android.view.View
 import android.widget.RemoteViews
@@ -40,71 +39,77 @@ class WeatherCalendarWidget : AppWidgetProvider() {
             appWidgetManager: AppWidgetManager,
             widgetId: Int
         ) {
+            // Primero mostrar hora/fecha de inmediato (sin esperar red)
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
+            val now = Date()
+            val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
+            val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "CL"))
+            views.setTextViewText(R.id.widget_time, timeFmt.format(now))
+            views.setTextViewText(R.id.widget_date, dateFmt.format(now))
+            appWidgetManager.updateAppWidget(widgetId, views)
 
+            // Luego buscar clima y eventos en background
             CoroutineScope(Dispatchers.IO).launch {
                 val weather = fetchWeather(context)
                 val events = fetchNextEvents(context)
-                val updateTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                val updateTime = timeFmt.format(Date())
 
                 withContext(Dispatchers.Main) {
+                    val updatedViews = RemoteViews(context.packageName, R.layout.widget_layout)
+
+                    // Hora y fecha (actualizar de nuevo)
+                    updatedViews.setTextViewText(R.id.widget_time, timeFmt.format(Date()))
+                    updatedViews.setTextViewText(R.id.widget_date, dateFmt.format(Date()))
+
                     // Clima
                     if (weather != null) {
-                        views.setTextViewText(R.id.widget_temp, "${weather.temp}°")
-                        views.setTextViewText(R.id.widget_condition, weather.condition)
+                        updatedViews.setTextViewText(R.id.widget_temp, "${weather.temp}°")
+                        updatedViews.setTextViewText(R.id.widget_condition, weather.condition)
                     } else {
-                        views.setTextViewText(R.id.widget_temp, "--°")
-                        views.setTextViewText(R.id.widget_condition, "Sin datos")
+                        updatedViews.setTextViewText(R.id.widget_temp, "--°")
+                        updatedViews.setTextViewText(R.id.widget_condition, "Sin datos")
                     }
 
                     // Eventos
                     when {
                         events.isEmpty() -> {
-                            views.setTextViewText(R.id.widget_event1, "📅 Sin eventos hoy")
-                            views.setViewVisibility(R.id.widget_event2, View.GONE)
+                            updatedViews.setTextViewText(R.id.widget_event1, "📅 Sin eventos hoy")
+                            updatedViews.setViewVisibility(R.id.widget_event2, View.GONE)
                         }
                         events.size == 1 -> {
-                            views.setTextViewText(R.id.widget_event1, "📅 ${events[0]}")
-                            views.setViewVisibility(R.id.widget_event2, View.GONE)
+                            updatedViews.setTextViewText(R.id.widget_event1, "📅 ${events[0]}")
+                            updatedViews.setViewVisibility(R.id.widget_event2, View.GONE)
                         }
                         else -> {
-                            views.setTextViewText(R.id.widget_event1, "📅 ${events[0]}")
-                            views.setTextViewText(R.id.widget_event2, "📅 ${events[1]}")
-                            views.setViewVisibility(R.id.widget_event2, View.VISIBLE)
+                            updatedViews.setTextViewText(R.id.widget_event1, "📅 ${events[0]}")
+                            updatedViews.setTextViewText(R.id.widget_event2, "📅 ${events[1]}")
+                            updatedViews.setViewVisibility(R.id.widget_event2, View.VISIBLE)
                         }
                     }
 
-                    // Última actualización
-                    views.setTextViewText(R.id.widget_updated, "Actualizado: $updateTime")
-
-                    appWidgetManager.updateAppWidget(widgetId, views)
+                    updatedViews.setTextViewText(R.id.widget_updated, "Act: $updateTime")
+                    appWidgetManager.updateAppWidget(widgetId, updatedViews)
                 }
             }
         }
 
         private suspend fun fetchWeather(context: Context): WeatherData? {
             return try {
-                val locationManager = context.getSystemService(Context.LOCATION_SERVICE)
+                val lm = context.getSystemService(Context.LOCATION_SERVICE)
                         as android.location.LocationManager
-
                 val location =
-                    locationManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
-                        ?: locationManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+                    lm.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+                        ?: lm.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
                         ?: return null
 
-                val lat = location.latitude
-                val lon = location.longitude
+                val url = "https://api.open-meteo.com/v1/forecast" +
+                        "?latitude=${location.latitude}&longitude=${location.longitude}" +
+                        "&current=temperature_2m,weathercode&timezone=auto"
 
-                val urlStr = "https://api.open-meteo.com/v1/forecast" +
-                        "?latitude=$lat&longitude=$lon" +
-                        "&current=temperature_2m,weathercode" +
-                        "&timezone=auto"
-
-                val json = JSONObject(URL(urlStr).readText())
+                val json = JSONObject(URL(url).readText())
                 val current = json.getJSONObject("current")
                 val temp = current.getDouble("temperature_2m").toInt()
                 val code = current.getInt("weathercode")
-
                 WeatherData(temp, weatherCodeToString(code))
             } catch (e: Exception) {
                 null
@@ -113,13 +118,9 @@ class WeatherCalendarWidget : AppWidgetProvider() {
 
         private fun fetchNextEvents(context: Context): List<String> {
             val events = mutableListOf<String>()
-
             return try {
                 val now = System.currentTimeMillis()
-                // Próximas 24 horas
                 val end = now + (24 * 60 * 60 * 1000L)
-
-                val uri = CalendarContract.Events.CONTENT_URI
                 val projection = arrayOf(
                     CalendarContract.Events.TITLE,
                     CalendarContract.Events.DTSTART,
@@ -129,27 +130,23 @@ class WeatherCalendarWidget : AppWidgetProvider() {
                     "${CalendarContract.Events.DTSTART} >= ? AND " +
                     "${CalendarContract.Events.DTSTART} <= ? AND " +
                     "${CalendarContract.Events.DELETED} = 0"
-                val selArgs = arrayOf(now.toString(), end.toString())
-                val sortOrder = "${CalendarContract.Events.DTSTART} ASC"
 
-                context.contentResolver.query(uri, projection, selection, selArgs, sortOrder)
-                    ?.use { cursor ->
-                        while (cursor.moveToNext() && events.size < 2) {
-                            val title = cursor.getString(0) ?: return@use
-                            val start = cursor.getLong(1)
-                            val allDay = cursor.getInt(2) == 1
-
-                            val label = if (allDay) {
-                                "Todo el día · $title"
-                            } else {
-                                val time = SimpleDateFormat("HH:mm", Locale.getDefault())
-                                    .format(Date(start))
-                                "$time · $title"
-                            }
-                            events.add(label)
-                        }
+                context.contentResolver.query(
+                    CalendarContract.Events.CONTENT_URI,
+                    projection,
+                    selection,
+                    arrayOf(now.toString(), end.toString()),
+                    "${CalendarContract.Events.DTSTART} ASC"
+                )?.use { cursor ->
+                    while (cursor.moveToNext() && events.size < 2) {
+                        val title = cursor.getString(0) ?: return@use
+                        val start = cursor.getLong(1)
+                        val allDay = cursor.getInt(2) == 1
+                        val label = if (allDay) "Todo el día · $title"
+                        else "${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(start))} · $title"
+                        events.add(label)
                     }
-
+                }
                 events
             } catch (e: Exception) {
                 events
@@ -159,19 +156,15 @@ class WeatherCalendarWidget : AppWidgetProvider() {
         private fun weatherCodeToString(code: Int): String = when (code) {
             0 -> "☀️ Despejado"
             1 -> "🌤️ Mayormente despejado"
-            2 -> "⛅ Parcialmente nublado"
+            2 -> "⛅ Parcial nublado"
             3 -> "☁️ Nublado"
             45, 48 -> "🌫️ Neblina"
             51, 53, 55 -> "🌦️ Llovizna"
-            61, 63 -> "🌧️ Lluvia moderada"
+            61, 63 -> "🌧️ Lluvia"
             65 -> "🌧️ Lluvia intensa"
             71, 73, 75 -> "❄️ Nieve"
-            77 -> "🌨️ Nieve granulada"
-            80, 81 -> "🌦️ Chubascos"
-            82 -> "⛈️ Chubascos intensos"
-            85, 86 -> "🌨️ Chubascos de nieve"
+            80, 81, 82 -> "🌦️ Chubascos"
             95 -> "⛈️ Tormenta"
-            96, 99 -> "⛈️ Tormenta con granizo"
             else -> "🌡️ Variable"
         }
     }
